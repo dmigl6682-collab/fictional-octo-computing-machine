@@ -36,13 +36,35 @@ jobs:
           pip install cython==0.29.36
           pip install "buildozer>=1.5.0" virtualenv
 
-      - name: Compile Android APK
+      - name: Locate Files and Compile APK
         run: |
+          # 1. If a zip was uploaded, extract it
+          if ls *.zip 1> /dev/null 2>&1; then
+            echo "Unzipping uploaded archive..."
+            unzip -o *.zip
+          fi
+
+          # 2. Find where buildozer.spec is located in the repo
+          SPEC_PATH=$(find . -name "buildozer.spec" | head -n 1)
+          if [ -z "$SPEC_PATH" ]; then
+            echo "ERROR: buildozer.spec was not uploaded to this repository!"
+            ls -laR
+            exit 1
+          fi
+
+          SPEC_DIR=$(dirname "$SPEC_PATH")
+          echo "Found buildozer.spec in: $SPEC_DIR"
+          cd "$SPEC_DIR"
+
+          # 3. Compile the APK
           yes | buildozer -v android debug
+
+          # 4. Copy APK to root bin directory for GitHub Actions upload
+          mkdir -p "$GITHUB_WORKSPACE/bin"
+          cp -v bin/*.apk "$GITHUB_WORKSPACE/bin/" 2>/dev/null || cp -v *.apk "$GITHUB_WORKSPACE/bin/" 2>/dev/null || true
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
-        if: always()
         with:
           name: aimobileapp-apk
           path: bin/*.apk
